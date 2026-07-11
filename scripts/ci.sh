@@ -15,4 +15,4 @@ cargo build --all-targets --locked
 cargo test --locked
 cargo clippy --all-targets --all-features --locked -- -D warnings
 node scripts/check-loc.mjs
-node --test --test-concurrency=1 "tests/node/*.test.js"
+node --test --test-concurrency=1 tests/node/*.test.js

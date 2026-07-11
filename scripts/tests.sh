@@ -11,4 +11,4 @@ if ! command -v cargo >/dev/null 2>&1; then
 fi
 
 cargo test --locked
-node --test --test-concurrency=1 "tests/node/*.test.js"
+node --test --test-concurrency=1 tests/node/*.test.js

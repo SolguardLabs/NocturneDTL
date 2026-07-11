@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Tests JavaScript para el nucleo Rust de privacidad contable Nocturne DTL.",
   "scripts": {
-    "test": "node --test --test-concurrency=1 \"tests/node/*.test.js\"",
+    "test": "node --test --test-concurrency=1 tests/node/*.test.js",
     "test:rust": "cargo test --locked",
     "build": "cargo build --locked",
     "loc": "node scripts/check-loc.mjs",
