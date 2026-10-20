@@ -14,6 +14,7 @@ pub mod events;
 pub mod hashing;
 pub mod ids;
 pub mod ledger;
+pub mod liquidity;
 pub mod nullifier;
 pub mod policy;
 pub mod position;
@@ -36,6 +37,7 @@ pub use ids::{
     AccountId, AssetId, BatchId, CommitmentId, NullifierId, PositionId, ReceiptId, UserId, WindowId,
 };
 pub use ledger::{LedgerConfig, LedgerSnapshot, NocturneLedger};
+pub use liquidity::LiquidityProfile;
 pub use privacy::{Commitment, CommitmentOpening, CommitmentStatus, Note};
 pub use reconcile::ReconciliationReport;
 pub use scenario::{run_scenario_json, ScenarioInput, ScenarioOutput};

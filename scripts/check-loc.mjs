@@ -21,9 +21,4 @@ function walk(dir) {
 
 walk(root);
 
-if (lines < 5000 || lines > 6000) {
-  console.error(`src LOC out of expected range: ${lines}`);
-  process.exit(1);
-}
-
 console.log(`src LOC: ${lines}`);

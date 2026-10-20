@@ -3,6 +3,7 @@ use crate::codec;
 use crate::errors::{NocturneError, Result};
 use crate::ids::{AccountId, AssetId, PositionId, UserId, WindowId};
 use crate::ledger::{LedgerConfig, LedgerSnapshot, NocturneLedger};
+use crate::liquidity::LiquidityProfile;
 use crate::privacy::{Note, NotePublicView};
 use crate::receipt::Receipt;
 use crate::reconcile::ReconciliationReport;
@@ -71,6 +72,7 @@ pub struct ScenarioOutput {
     pub receipts: Vec<Receipt>,
     pub reconciliations: Vec<ReconciliationReport>,
     pub snapshot: LedgerSnapshot,
+    pub liquidity_profiles: Vec<LiquidityProfile>,
 }
 
 #[derive(Default)]
@@ -168,11 +170,24 @@ pub fn run_scenario(input: ScenarioInput) -> Result<ScenarioOutput> {
         }
     }
 
+    let liquidity_profiles = ledger
+        .vaults()
+        .all()
+        .map(|vault| {
+            LiquidityProfile::evaluate(
+                vault,
+                &ledger.config().withdrawal,
+                crate::amount::BasisPoints::new(2_000)?,
+            )
+        })
+        .collect::<Result<Vec<_>>>()?;
+
     Ok(ScenarioOutput {
         notes: notes.public,
         receipts: ledger.receipts().to_vec(),
         reconciliations,
         snapshot: ledger.snapshot(),
+        liquidity_profiles,
     })
 }
 

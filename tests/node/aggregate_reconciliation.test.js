@@ -54,4 +54,9 @@ test("reconciles aggregate vault state across multiple accounts", () => {
   assert.equal(asset.reserves, 150);
   assert.equal(asset.account_balances, 150);
   assert.equal(out.reconciliations[0].balanced, true);
+  const liquidity = out.liquidity_profiles.find((item) => item.asset === "DTL");
+  assert.equal(liquidity.reserve, 150);
+  assert.equal(liquidity.stressed_reserve, 120);
+  assert.equal(liquidity.observed_capacity, 120);
+  assert.equal(liquidity.nominal_conservation, true);
 });

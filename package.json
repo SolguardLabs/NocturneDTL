@@ -1,9 +1,9 @@
 {
   "name": "nocturne-dtl",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Tests JavaScript para el nucleo Rust de privacidad contable Nocturne DTL.",
+  "description": "Integración y pruebas del motor contable privado NocturneDTL.",
   "scripts": {
     "test": "node --test --test-concurrency=1 tests/node/*.test.js",
     "test:rust": "cargo test --locked",
