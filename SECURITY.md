@@ -1,35 +1,34 @@
-# Modelo De Seguridad
+# Política de seguridad
 
-NocturneDTL asume que los operadores de protocolo deben mantener cuatro
-invariantes:
+## Alcance
 
-1. Todo retiro agregado debe estar respaldado por reservas del vault del activo.
-2. Un commitment consumido no puede volver a liquidarse en el dominio interno.
-3. Los nullifiers deben ser unicos dentro del ledger y persistir entre ventanas.
-4. La reconciliacion debe conservar la igualdad entre depositos, reservas y
-   retiros ejecutados.
+Se revisan las transiciones Rust, el contrato JSON, las políticas de admisión y retiro, la integridad de notas/anuladores y la contabilidad por activo. El motor es local y no ofrece servicio público ni custodia externa. Una prueba verde demuestra que se ejecutaron las comprobaciones previstas, no que el diseño carezca de riesgos.
 
-## Alcance De Revision
+## Comunicación responsable
 
-La revision debe incluir el crate Rust, el contrato JSON del binario, los tests
-JavaScript, las politicas de ventana y la salida de reconciliacion. El sistema no
-incluye red P2P, custodia real, integracion on-chain ni generacion de pruebas de
-conocimiento cero reales.
+Si detectas un problema, utiliza el canal privado de avisos de seguridad de GitHub del repositorio, cuando esté habilitado. No publiques detalles explotables en una issue o un PR antes de coordinar la revisión. Incluye revisión afectada, precondiciones, entrada JSON mínima, resultado observado, resultado esperado e impacto contable. No compartas aperturas secretas ni datos ajenos en canales públicos.
 
-## Validaciones Automatizadas
+## Controles de esta distribución
 
-- `cargo test --locked` valida la API Rust.
-- `node --test "tests/node/*.test.js"` valida flujos de caja negra.
-- `bash scripts/ci.sh` ejecuta formato, build, tests y lint local.
+| Control | Qué verifica | Límite |
+| --- | --- | --- |
+| Formato, compilación y Clippy | Integridad de build y reglas de lint | No evalúa lógica económica |
+| Tests Rust y Node.js | Transiciones y contrato externo conocidos | Cobertura no exhaustiva |
+| Anuladores | Unicidad de identificadores ya consumidos | Debe evaluarse junto a identidad económica |
+| Política de retiro | Mínimo y máximo por solicitud | No sustituye análisis de solvencia |
+| Reconciliación | Conservación agregada por activo | No certifica exposición individual |
+| Perfil de liquidez | Reserva y capacidad bajo recorte de 2.000 bps | Métrica informativa, no bloqueo |
 
-## Gestion De Dependencias
+```mermaid
+flowchart TD
+    E[Entrada JSON] --> V[Validación de operación]
+    V --> C[Estado de compromiso y anulador]
+    C --> P[Políticas de cuenta y retiro]
+    P --> L[Ledger y vault]
+    L --> R[Recibos y reconciliación]
+    L --> A[Snapshot de exposición]
+    R --> M[Monitoreo operativo]
+    A --> M
+```
 
-Las dependencias son deliberadamente reducidas. `serde` define el contrato JSON,
-`blake3` modela compromisos criptograficos deterministas y `thiserror` mantiene
-un contrato de errores estable para integraciones.
-
-## Reportes Internos
-
-Los reportes deben incluir activo, ventana, identificadores de commitment,
-recibos, snapshot de vaults y pasos de reproduccion. No incluir secretos de
-apertura en canales compartidos.
+Antes de distribuir una revisión, ejecutar `bash scripts/ci.sh`, inspeccionar dependencias y comprobar que `main`, `production` y el tag publicado resuelven al mismo commit.
