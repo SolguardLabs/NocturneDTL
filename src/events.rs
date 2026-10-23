@@ -10,6 +10,7 @@ pub enum EventKind {
     CommitmentRotated,
     CommitmentSpent,
     WithdrawalExecuted,
+    TreasuryYieldFunded,
     ReconciliationBuilt,
 }
 

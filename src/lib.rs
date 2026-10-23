@@ -28,6 +28,7 @@ pub mod scenario;
 pub mod vault;
 pub mod window;
 pub mod withdrawal;
+pub mod yield_curve;
 
 pub use account::{Account, AccountBook};
 pub use amount::{Amount, AssetAmount, BasisPoints, SignedAmount};

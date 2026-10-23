@@ -1,6 +1,7 @@
 use crate::amount::Amount;
 use crate::ids::{AssetId, PositionId};
 use crate::ledger::NocturneLedger;
+use crate::privacy::CommitmentStatus;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -12,6 +13,7 @@ pub struct PositionExposure {
     pub commitments_issued: usize,
     pub commitments_consumed: usize,
     pub active_value: u64,
+    pub archived_value: u64,
     pub consumed_value: u64,
 }
 
@@ -19,6 +21,7 @@ pub struct PositionExposure {
 pub struct AuditSnapshot {
     pub exposures: Vec<PositionExposure>,
     pub total_active_by_asset: BTreeMap<AssetId, u64>,
+    pub total_archived_by_asset: BTreeMap<AssetId, u64>,
     pub total_consumed_by_asset: BTreeMap<AssetId, u64>,
 }
 
@@ -27,36 +30,30 @@ pub struct LedgerAuditor;
 impl LedgerAuditor {
     pub fn snapshot(ledger: &NocturneLedger) -> AuditSnapshot {
         let mut active: BTreeMap<PositionId, Amount> = BTreeMap::new();
+        let mut archived: BTreeMap<PositionId, Amount> = BTreeMap::new();
         let mut consumed: BTreeMap<PositionId, Amount> = BTreeMap::new();
         let mut total_active_by_asset: BTreeMap<AssetId, Amount> = BTreeMap::new();
+        let mut total_archived_by_asset: BTreeMap<AssetId, Amount> = BTreeMap::new();
         let mut total_consumed_by_asset: BTreeMap<AssetId, Amount> = BTreeMap::new();
 
         for commitment in ledger.commitments().values() {
-            if commitment.status.is_spendable() {
-                let current = active
-                    .get(&commitment.position)
-                    .copied()
-                    .unwrap_or(Amount::ZERO);
-                active.insert(commitment.position.clone(), current + commitment.amount);
-                let aggregate = total_active_by_asset
-                    .get(&commitment.asset)
-                    .copied()
-                    .unwrap_or(Amount::ZERO);
-                total_active_by_asset
-                    .insert(commitment.asset.clone(), aggregate + commitment.amount);
-            } else {
-                let current = consumed
-                    .get(&commitment.position)
-                    .copied()
-                    .unwrap_or(Amount::ZERO);
-                consumed.insert(commitment.position.clone(), current + commitment.amount);
-                let aggregate = total_consumed_by_asset
-                    .get(&commitment.asset)
-                    .copied()
-                    .unwrap_or(Amount::ZERO);
-                total_consumed_by_asset
-                    .insert(commitment.asset.clone(), aggregate + commitment.amount);
-            }
+            let (by_position, by_asset) = match commitment.status {
+                CommitmentStatus::Pending | CommitmentStatus::Active => {
+                    (&mut active, &mut total_active_by_asset)
+                }
+                CommitmentStatus::Archived => (&mut archived, &mut total_archived_by_asset),
+                CommitmentStatus::Spent => (&mut consumed, &mut total_consumed_by_asset),
+            };
+            let current = by_position
+                .get(&commitment.position)
+                .copied()
+                .unwrap_or(Amount::ZERO);
+            by_position.insert(commitment.position.clone(), current + commitment.amount);
+            let aggregate = by_asset
+                .get(&commitment.asset)
+                .copied()
+                .unwrap_or(Amount::ZERO);
+            by_asset.insert(commitment.asset.clone(), aggregate + commitment.amount);
         }
 
         let exposures = ledger
@@ -74,6 +71,12 @@ impl LedgerAuditor {
                     .unwrap_or(Amount::ZERO)
                     .units()
                     .min(u128::from(u64::MAX)) as u64,
+                archived_value: archived
+                    .get(&position.id)
+                    .copied()
+                    .unwrap_or(Amount::ZERO)
+                    .units()
+                    .min(u128::from(u64::MAX)) as u64,
                 consumed_value: consumed
                     .get(&position.id)
                     .copied()
@@ -86,6 +89,10 @@ impl LedgerAuditor {
         AuditSnapshot {
             exposures,
             total_active_by_asset: total_active_by_asset
+                .into_iter()
+                .map(|(asset, amount)| (asset, to_u64(amount)))
+                .collect(),
+            total_archived_by_asset: total_archived_by_asset
                 .into_iter()
                 .map(|(asset, amount)| (asset, to_u64(amount)))
                 .collect(),

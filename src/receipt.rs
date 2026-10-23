@@ -36,11 +36,20 @@ pub struct WithdrawalReceipt {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct TreasuryFundingReceipt {
+    pub id: ReceiptId,
+    pub asset: AssetId,
+    pub amount: Amount,
+    pub window: WindowId,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Receipt {
     Deposit(DepositReceipt),
     Spend(SpendReceipt),
     Withdrawal(WithdrawalReceipt),
+    TreasuryFunding(TreasuryFundingReceipt),
 }
 
 impl Receipt {
@@ -49,6 +58,7 @@ impl Receipt {
             Self::Deposit(receipt) => &receipt.id,
             Self::Spend(receipt) => &receipt.id,
             Self::Withdrawal(receipt) => &receipt.id,
+            Self::TreasuryFunding(receipt) => &receipt.id,
         }
     }
 }

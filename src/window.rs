@@ -79,9 +79,17 @@ impl PrivacyWindow {
     }
 
     pub fn record_commitment(&mut self, amount: Amount) -> Result<()> {
-        self.ensure_accepting()?;
+        self.ensure_capacity()?;
         self.metrics.commitments_created += 1;
         self.metrics.total_value = self.metrics.total_value.checked_add(amount)?;
+        Ok(())
+    }
+
+    pub fn ensure_capacity(&self) -> Result<()> {
+        self.ensure_accepting()?;
+        if self.metrics.commitments_created >= self.policy.max_commitments {
+            return Err(NocturneError::WindowCommitmentLimit(self.id));
+        }
         Ok(())
     }
 
@@ -131,6 +139,10 @@ impl WindowBook {
 
     pub fn ensure_accepting(&self, id: WindowId) -> Result<()> {
         self.get(id)?.ensure_accepting()
+    }
+
+    pub fn ensure_capacity(&self, id: WindowId) -> Result<()> {
+        self.get(id)?.ensure_capacity()
     }
 
     pub fn settle(&mut self, id: WindowId) -> Result<()> {

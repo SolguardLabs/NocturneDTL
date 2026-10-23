@@ -10,19 +10,25 @@ use crate::policy::{AdmissionPolicy, WithdrawalPolicy};
 use crate::position::PositionBook;
 use crate::privacy::{derive_nullifier, Commitment, CommitmentOpening, Note};
 use crate::proof::CommitmentVerifier;
-use crate::receipt::{DepositReceipt, Receipt, SpendReceipt, WithdrawalReceipt};
+use crate::receipt::{
+    DepositReceipt, Receipt, SpendReceipt, TreasuryFundingReceipt, WithdrawalReceipt,
+};
 use crate::reconcile::{Reconciler, ReconciliationReport};
 use crate::vault::VaultBook;
 use crate::window::WindowBook;
+use crate::yield_curve::YieldCurve;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(default)]
 pub struct LedgerConfig {
     pub protocol_domain: String,
     pub operator: String,
     pub admission: AdmissionPolicy,
     pub withdrawal: WithdrawalPolicy,
+    #[serde(default)]
+    pub yield_curve: YieldCurve,
 }
 
 impl Default for LedgerConfig {
@@ -32,6 +38,7 @@ impl Default for LedgerConfig {
             operator: "operator.local".to_string(),
             admission: AdmissionPolicy::default(),
             withdrawal: WithdrawalPolicy::default(),
+            yield_curve: YieldCurve::default(),
         }
     }
 }
@@ -155,6 +162,7 @@ impl NocturneLedger {
     }
 
     pub fn open_window(&mut self, id: WindowId, anchor: impl Into<String>) -> Result<()> {
+        self.config.yield_curve.index_at(id)?;
         self.windows.open(id, anchor);
         let event = self
             .push_event(EventKind::WindowOpened, "window opened")
@@ -174,9 +182,13 @@ impl NocturneLedger {
         blinding: impl Into<String>,
     ) -> Result<(Note, DepositReceipt)> {
         self.assets.get(&asset)?;
+        self.config.yield_curve.index_at(window)?;
         self.windows.ensure_open(window);
-        self.windows.ensure_accepting(window)?;
+        self.windows.ensure_capacity(window)?;
         self.config.admission.validate_amount(amount)?;
+        if self.positions.get(&position).is_ok() {
+            return Err(NocturneError::PositionAlreadyOpen(position));
+        }
 
         let nonce = self.tick();
         let opening = CommitmentOpening::new(
@@ -198,7 +210,7 @@ impl NocturneLedger {
         self.accounts.ensure(account.clone(), owner.clone());
         self.windows.get_mut(window)?.record_commitment(amount)?;
         self.positions
-            .open_or_validate(position.clone(), owner, asset.clone(), amount, window)?
+            .open(position.clone(), owner, asset.clone(), amount, window)?
             .record_commitment(commitment.id.clone());
         self.commitments
             .insert(commitment.id.clone(), commitment.clone());
@@ -241,14 +253,37 @@ impl NocturneLedger {
         }
         CommitmentVerifier::verify_note(note, existing)?;
         self.windows.ensure_open(next_window);
-        self.windows.ensure_accepting(next_window)?;
+        self.windows.ensure_capacity(next_window)?;
+        let position = self.positions.get(&existing.position)?;
+        if next_window.epoch() <= existing.window.epoch()
+            || next_window.epoch() - existing.window.epoch()
+                > self.config.admission.max_rollover_gap
+            || position.notes_issued >= self.config.admission.max_notes_per_position
+            || position.lifecycle != crate::position::PositionLifecycle::Open
+        {
+            return Err(NocturneError::InvalidWindowTransition);
+        }
+        let valued_amount = self.config.yield_curve.value_at(
+            existing.amount,
+            position.opened_window,
+            next_window,
+        )?;
 
         let nonce = self.tick();
-        let opening = note.opening.rotated(next_window, blinding, nonce);
+        let opening = note
+            .opening
+            .rotated_with_amount(next_window, valued_amount, blinding, nonce);
         let (rolled_note, commitment) = Note::new(opening, nonce);
+        if self.commitments.contains_key(&commitment.id) {
+            return Err(NocturneError::CommitmentMismatch(commitment.id));
+        }
         self.windows
             .get_mut(next_window)?
             .record_commitment(commitment.amount)?;
+        self.commitments
+            .get_mut(&note.commitment)
+            .ok_or_else(|| NocturneError::UnknownCommitment(note.commitment.clone()))?
+            .archive();
         self.positions
             .get_mut(&commitment.position)?
             .record_commitment(commitment.id.clone());
@@ -264,6 +299,39 @@ impl NocturneLedger {
             .with_position(commitment.position.clone());
         self.events.push(event);
         Ok(rolled_note)
+    }
+
+    pub fn fund_yield(
+        &mut self,
+        operator: &str,
+        asset: AssetId,
+        amount: Amount,
+        window: WindowId,
+    ) -> Result<TreasuryFundingReceipt> {
+        if operator != self.config.operator {
+            return Err(NocturneError::UnauthorizedTreasuryOperator);
+        }
+        if amount.is_zero() {
+            return Err(NocturneError::InvalidAmount);
+        }
+        self.assets.get(&asset)?;
+        self.windows.get(window)?;
+        self.vaults.deposit(asset.clone(), amount)?;
+        let receipt = TreasuryFundingReceipt {
+            id: self.receipt_id("fund"),
+            asset: asset.clone(),
+            amount,
+            window,
+        };
+        self.receipts
+            .push(Receipt::TreasuryFunding(receipt.clone()));
+        let event = self
+            .push_event(EventKind::TreasuryYieldFunded, "treasury yield funded")
+            .with_window(window)
+            .with_asset_amount(asset, amount)
+            .with_receipt(receipt.id.clone());
+        self.events.push(event);
+        Ok(receipt)
     }
 
     pub fn spend(
@@ -344,11 +412,26 @@ impl NocturneLedger {
     ) -> Result<WithdrawalReceipt> {
         self.assets.get(&asset)?;
         self.config.withdrawal.validate(amount)?;
+        self.windows.get(window)?;
+        if self.vaults.get(&asset)?.reserves < amount {
+            return Err(NocturneError::VaultReserveTooLow {
+                asset: asset.clone(),
+                requested: amount.units(),
+                available: self.vaults.get(&asset)?.reserves.units(),
+            });
+        }
+        if self.accounts.get(&account)?.balance(&asset) < amount {
+            return Err(NocturneError::BalanceTooLow {
+                account: account.clone(),
+                asset: asset.clone(),
+                requested: amount.units(),
+                available: self.accounts.get(&account)?.balance(&asset).units(),
+            });
+        }
         self.accounts.debit(&account, &asset, amount)?;
         self.vaults.withdraw(&asset, amount)?;
         self.accounts
             .record_withdrawal(&account, asset.clone(), amount)?;
-        self.windows.ensure_open(window);
         self.windows.get_mut(window)?.record_withdrawal(amount)?;
 
         let receipt = WithdrawalReceipt {

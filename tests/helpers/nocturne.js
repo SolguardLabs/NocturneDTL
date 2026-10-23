@@ -5,10 +5,10 @@ import { fileURLToPath } from "node:url";
 const here = dirname(fileURLToPath(import.meta.url));
 export const root = resolve(here, "../..");
 
-export function runScenario(operations) {
+export function runScenario(operations, config) {
   const result = spawnSync("cargo", ["run", "--quiet", "--", "--json"], {
     cwd: root,
-    input: JSON.stringify({ operations }),
+    input: JSON.stringify({ operations, config }),
     encoding: "utf8",
     windowsHide: true,
   });
@@ -18,10 +18,10 @@ export function runScenario(operations) {
   return JSON.parse(result.stdout);
 }
 
-export function runScenarioFailure(operations) {
+export function runScenarioFailure(operations, config) {
   const result = spawnSync("cargo", ["run", "--quiet", "--", "--json"], {
     cwd: root,
-    input: JSON.stringify({ operations }),
+    input: JSON.stringify({ operations, config }),
     encoding: "utf8",
     windowsHide: true,
   });

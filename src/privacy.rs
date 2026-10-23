@@ -39,11 +39,21 @@ impl CommitmentOpening {
     }
 
     pub fn rotated(&self, window: WindowId, blinding: impl Into<String>, nonce: u64) -> Self {
+        self.rotated_with_amount(window, self.amount, blinding, nonce)
+    }
+
+    pub fn rotated_with_amount(
+        &self,
+        window: WindowId,
+        amount: Amount,
+        blinding: impl Into<String>,
+        nonce: u64,
+    ) -> Self {
         Self {
             owner: self.owner.clone(),
             account: self.account.clone(),
             asset: self.asset.clone(),
-            amount: self.amount,
+            amount,
             position: self.position.clone(),
             window,
             blinding: blinding.into(),
