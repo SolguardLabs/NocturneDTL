@@ -28,6 +28,12 @@ pub enum ScenarioOperation {
         window: u64,
         anchor: String,
     },
+    FundYield {
+        operator: String,
+        asset: String,
+        amount: u64,
+        window: u64,
+    },
     Deposit {
         note: String,
         owner: String,
@@ -109,6 +115,19 @@ pub fn run_scenario(input: ScenarioInput) -> Result<ScenarioOutput> {
             }
             ScenarioOperation::OpenWindow { window, anchor } => {
                 ledger.open_window(WindowId::new(window), anchor)?;
+            }
+            ScenarioOperation::FundYield {
+                operator,
+                asset,
+                amount,
+                window,
+            } => {
+                ledger.fund_yield(
+                    &operator,
+                    AssetId::new(asset),
+                    Amount::new(u128::from(amount))?,
+                    WindowId::new(window),
+                )?;
             }
             ScenarioOperation::Deposit {
                 note,

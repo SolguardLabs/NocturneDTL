@@ -33,6 +33,7 @@ impl AdmissionPolicy {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(default)]
 pub struct WithdrawalPolicy {
     pub minimum_withdrawal: Amount,
     pub daily_limit: Amount,

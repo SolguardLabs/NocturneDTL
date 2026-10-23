@@ -42,8 +42,16 @@ pub enum NocturneError {
     CommitmentMismatch(CommitmentId),
     #[error("window is not accepting commitments: {0}")]
     WindowClosed(WindowId),
+    #[error("window commitment capacity reached: {0}")]
+    WindowCommitmentLimit(WindowId),
     #[error("position metadata mismatch: {0}")]
     PositionMismatch(PositionId),
+    #[error("position already opened: {0}")]
+    PositionAlreadyOpen(PositionId),
+    #[error("invalid window transition")]
+    InvalidWindowTransition,
+    #[error("unauthorized treasury operator")]
+    UnauthorizedTreasuryOperator,
     #[error("scenario note label not found: {0}")]
     ScenarioNoteMissing(String),
     #[error("scenario error: {0}")]

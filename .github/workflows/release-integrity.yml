@@ -28,5 +28,5 @@ jobs:
           test "$main_sha" = "$production_sha"
           test "$main_sha" = "$tag_sha"
           if [[ "${{ github.event_name }}" = release ]]; then
-            test "${{ github.event.release.name }}" = "Production 1.0.0"
+            test "${{ github.event.release.name }}" = "Production ${RELEASE_TAG#v}"
           fi

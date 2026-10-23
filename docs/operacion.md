@@ -16,6 +16,7 @@ La validación completa ejecuta formato, build, tests Rust, Clippy con warnings 
 2. Comparar recibos con `operations` y `snapshot.clock`.
 3. Comprobar conservación por activo y exposición por posición; ninguna sustituye a la otra.
 4. Examinar `liquidity_profiles` como análisis posterior, no autorización de pagos.
-5. Registrar SHA y repetir pruebas sobre el mismo árbol antes de publicar el tag.
+5. Comparar el calendario de tasas con los índices de las ventanas y los recibos de `fund_yield`.
+6. Registrar SHA y repetir pruebas sobre el mismo árbol antes de publicar el tag.
 
 No almacenar aperturas reales, credenciales, claves privadas ni datos de terceros en escenarios versionados. El destino de un retiro es una cadena de salida del motor local; no se transmite una transacción a una red.

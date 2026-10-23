@@ -78,7 +78,7 @@ impl PositionBook {
         Self::default()
     }
 
-    pub fn open_or_validate(
+    pub fn open(
         &mut self,
         id: PositionId,
         owner: UserId,
@@ -87,10 +87,7 @@ impl PositionBook {
         window: WindowId,
     ) -> Result<&mut EconomicPosition> {
         match self.positions.entry(id.clone()) {
-            Entry::Occupied(entry) => {
-                entry.get().ensure_matches(&owner, &asset, principal)?;
-                Ok(entry.into_mut())
-            }
+            Entry::Occupied(_) => Err(NocturneError::PositionAlreadyOpen(id)),
             Entry::Vacant(entry) => {
                 Ok(entry.insert(EconomicPosition::new(id, owner, asset, principal, window)))
             }
